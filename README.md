@@ -14,7 +14,7 @@
 ## 🌍 Overview
 
 **UncertaintyZoo** is a unified, extensible, and easy-to-use Python toolkit for estimating **predictive uncertainty** in deep learning systems.  
-It supports a wide range of **uncertainty quantification (UQ) methods** — from probability-based scores to **input-level**, **reasoning-level**, and **information-theoretic** approaches — making it a one-stop solution for uncertainty analysis in both **classification** and **generative** tasks.
+It supports 29+ **Uncertainty Quantification (UQ)** methods — covering probability-based, ensemble-based, input-level, reasoning-level, and topological uncertainty — for both **discriminative** (e.g., CodeBERT) and **generative** (e.g., ChatGLM, Qwen, LLaMA) models.
 
 ---
 
@@ -24,29 +24,58 @@ It supports a wide range of **uncertainty quantification (UQ) methods** — from
 
 ```python
 from uncertainty import Quantifier
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-# Initialize with model and tokenizer
-uq = Quantifier(model, tokenizer, methods=["mc_dropout_var"])
+# Load a discriminative model (e.g., CodeBERT)
+tokenizer = AutoTokenizer.from_pretrained("microsoft/codebert-base")
+model = AutoModelForSequenceClassification.from_pretrained("microsoft/codebert-base", num_labels=2)
+model.tokenizer = tokenizer
+
+# Initialize Quantifier with a chosen method
+uq = Quantifier(model, methods=["mc_dropout_variance"])
 
 # Compute uncertainty for an input
-score = uq.quantify("def add(a, b): return a + b")
+score = uq.quantify(
+    input_text="int main(){ char buf[8]; gets(buf); }",
+    model_type="discriminative",
+    label_tokens=["Yes", "No"]
+)
+
 print("Uncertainty:", score)
 ```
 
-### 2️⃣ Advanced Setup (Hybrid / Reasoning / Embedding-level)
+---
+
+### 2️⃣ Generative Model Example
 
 ```python
-uq = Quantifier(
-    model=disc_model,
-    tokenizer=disc_tokenizer,
-    gen_model=gen_model,
-    gen_tokenizer=gen_tokenizer,
-    embed_model=embed_model,
-    embed_tokenizer=embed_tokenizer,
-    methods=["topologyuq", "cotuq", "spuq"]
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from uncertainty import Quantifier
+
+# Load a generative model (e.g., ChatGLM)
+tokenizer = AutoTokenizer.from_pretrained("THUDM/chatglm3-6b", trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained("THUDM/chatglm3-6b", trust_remote_code=True).eval()
+model.tokenizer = tokenizer
+
+# Initialize Quantifier
+uq = Quantifier(model, methods=["mutual_information", "spuq", "cot_uq"])
+
+# Run uncertainty analysis on a reasoning prompt
+prompt = (
+    "You are a vulnerability detection assistant.\n"
+    "Decide whether the following C code is vulnerable.\n\n"
+    "Code:\nint main(){ char buf[8]; gets(buf); }\n\n"
+    "Answer only with 'Yes' or 'No'."
 )
 
-score = uq.quantify(prompt="Analyze the following code function:")
+score = uq.quantify(
+    input_text=prompt,
+    model_type="generative",
+    num_samples=5,
+    label_tokens=["Yes", "No"]
+)
+
+print(score)
 ```
 
 ---
@@ -54,113 +83,141 @@ score = uq.quantify(prompt="Analyze the following code function:")
 ## 🧩 Supported Uncertainty Quantification Methods
 
 <p align="center">
-  <b>Total Methods:</b> 29 | <b>Categories:</b> Predictive Distribution · Ensemble · Input Sampling · Reasoning · Representation
+  <b>Total Methods:</b> 29 | <b>Categories:</b> Predictive · Ensemble · Input Sampling · Reasoning · Representation
 </p>
 
 <details>
 <summary><b>📊 Expand Table of Methods</b></summary>
 
-| Category                         | Method                                                                                                                                                                               | Task Type |       Level        |   Supported by    |
-| :------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------: | :----------------: | :---------------: |
-| **Predictive Distribution (11)** | Avg. NLL / Avg. Probability / Perplexity / Max Token Entropy / Avg. Prediction Entropy / Token Impossibility / Margin / Max Prob. / Least Confidence / Predictive Entropy / DeepGini |     C     |   Token / Output   |      🧠 Both      |
-| **Ensemble (9)**                 | Expected Entropy / Mutual Info (BALD) / MC Dropout Var / Class Prediction Var / Class Probability Var / Sample Var / Max Diff Var / Min Var / Cosine Similarity                      |     C     | Output / Embedding |      🧠 Both      |
-| **Input-Level Sampling (3)**     | SPUQ / ICL-Sample / ICE                                                                                                                                                              |    NC     |       Input        |   🤖 Generative   |
-| **Reasoning (5)**                | UAG / CoT-UQ / ToT-UQ / TopologyUQ / SEC                                                                                                                                             |   Both    |     Reasoning      |   🤖 Generative   |
-| **Representation (1)**           | Logit Lens Entropy                                                                                                                                                                   |     C     |    Hidden-State    | 🧩 Discriminative |
+| Category                         | Method                                                                                                                                                                                                                                 |     Task Type      |       Level        | Supported Model |
+| :------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----------------: | :----------------: | :-------------: |
+| **Predictive Distribution (11)** | `average_neg_log_likelihood`, `average_probability`, `perplexity`, `max_token_entropy`, `avg_prediction_entropy`, `token_impossibility_score`, `margin_score`, `max_probability`, `least_confidence`, `predictive_entropy`, `deepgini` |   Classification   |   Token / Output   |      Both       |
+| **Ensemble (9)**                 | `expected_entropy`, `mutual_information`, `mc_dropout_variance`, `class_prediction_variance`, `class_probability_variance`, `sample_variance`, `max_diff_variance`, `min_variance`, `cosine_similarity_embeddings`                     |   Classification   | Output / Embedding |      Both       |
+| **Input-Level (3)**              | `spuq`, `ice`, `icl_sample`                                                                                                                                                                                                            | Non-Classification |       Input        |   Generative    |
+| **Reasoning (5)**                | `uag`, `cot_uq`, `topology_uq`, `tout`, `stable_explanation_conf`                                                                                                                                                                      |        Both        |     Reasoning      |   Generative    |
+| **Representation (1)**           | `logit_lens_entropy`                                                                                                                                                                                                                   |   Classification   |    Hidden-State    | Discriminative  |
 
 </details>
 
 ---
 
-## 🧠 Model-Specific Usage
-
-### 💎 ① Discriminative Models (e.g., CodeBERT, RoBERTa)
+## 💎 Discriminative Models (e.g., CodeBERT, RoBERTa)
 
 ```python
 from uncertainty import Quantifier
 
-uq = Quantifier(model, tokenizer, methods=[
-    "average_negative_log_likelihood",
-    "maximum_probability",
+uq = Quantifier(model, methods=[
+    "average_neg_log_likelihood",
+    "max_probability",
     "deepgini"
 ])
 
-inputs = <task>
-score = uq.quantify(inputs)
-print("Discriminative UQ Score:", score)
+score = uq.quantify(
+    input_text="int main(){ char buf[8]; gets(buf); }",
+    model_type="discriminative",
+    label_tokens=["Yes", "No"]
+)
+
+print("UQ Score:", score)
 ```
 
 ---
 
-### 🔮 ② Generative Models (e.g., ChatGLM, Qwen, LLaMA)
+## 🔮 Generative Models (e.g., ChatGLM, Qwen, LLaMA)
 
 ```python
 from uncertainty import Quantifier
 
-uq = Quantifier(
-    model=gen_model,
-    tokenizer=gen_tokenizer,
-    methods=["mutual_information", "spuq", "cotuq"]
+uq = Quantifier(model, methods=["mutual_information", "spuq", "cot_uq"])
+
+prompt = (
+    "You are a vulnerability detection assistant.\n"
+    "Determine whether this code is vulnerable.\n\n"
+    "int main(){ char buf[8]; gets(buf); }\n\n"
+    "Answer only 'Yes' or 'No'."
 )
 
-prompt = <prompt> + code_snippet
-result = uq.quantify(prompt)
+score = uq.quantify(
+    input_text=prompt,
+    model_type="generative",
+    num_samples=5,
+    label_tokens=["Yes", "No"]
+)
 
-print("Generative UQ:", result)
+print("Generative UQ:", score)
 ```
 
 ---
 
-## 🧩 Input-Level Sampling Examples
+## 🧩 Input-Level Sampling Methods
 
 ```python
-uq = Quantifier(gen_model, gen_tokenizer, methods=["spuq", "icl_sample", "ice"])
+uq = Quantifier(model, methods=["spuq", "icl_sample", "ice"])
 
-# SPUQ: Self-Perturbation UQ
-uq.quantify(prompt, N=6)
+# Self-Perturbation Uncertainty (SPUQ)
+uq.quantify(
+    input_text=prompt,
+    model_type="generative",
+    num_perturb=5,
+    label_tokens=["Yes", "No"]
+)
 
-# ICL-Sample: Few-shot Sampling
-uq.quantify(prompt, icl_examples=examples, k_shot=2, n_contexts=5)
+# In-Context Learning Sampling (ICL-Sample)
+uq.quantify(
+    input_text=prompt,
+    model_type="generative",
+    num_clarifications=6,
+    label_tokens=["Yes", "No"]
+)
 
-# ICE: Input Clarification Ensemble
-uq.quantify(prompt, paraphrase_prompts=True)
+# Input Clarification Ensemble (ICE)
+uq.quantify(
+    input_text=prompt,
+    model_type="generative",
+    label_tokens=["Yes", "No"]
+)
 ```
 
 ---
 
-## 🧭 Reasoning-Level UQ Examples
+## 🧭 Reasoning-Level Uncertainty
 
 ```python
-uq = Quantifier(gen_model, gen_tokenizer, methods=["uag", "cotuq", "tout", "topologyuq", "sec"])
+uq = Quantifier(model, methods=["uag", "cot_uq", "topology_uq", "stable_explanation_conf", "tout"])
 
-# Gradient-based attention uncertainty
-uag = uq.quantify(prompt, method="uag")
+# Attention Gradient Sensitivity
+uag = uq.quantify(input_text=prompt, model_type="generative")
 
-# Chain-of-Thought and Tree-of-Thought
-cot = uq.quantify(prompt, method="cotuq", n_paths=5)
-tout = uq.quantify(prompt, method="tout", depth=3)
+# Chain-of-Thought UQ
+cot = uq.quantify(input_text=prompt, model_type="generative", num_chains=5)
 
-# Structural reasoning
-topo = uq.quantify(prompt, method="topologyuq")
+# Tree-of-Thought UQ
+tout = uq.quantify(input_text=prompt, model_type="generative", depth=3, branching=4)
 
-# Stable Explanation Consistency
-sec = uq.quantify(prompt, method="sec")
+# Topology-based Reasoning Stability
+topo = uq.quantify(input_text=prompt, model_type="generative")
+
+# Stable Explanation Confidence
+sec = uq.quantify(input_text=prompt, model_type="generative")
 ```
 
 ---
 
 ## 🧱 Parameter Legend
 
-| Parameter                        | Description                                                   |
-| :------------------------------- | :------------------------------------------------------------ |
-| `model`, `tokenizer`             | The primary discriminative or generative model and tokenizer  |
-| `gen_model`, `gen_tokenizer`     | Optional: for CoT / ToT / reasoning-level uncertainty         |
-| `embed_model`, `embed_tokenizer` | Optional: for embedding-level uncertainty                     |
-| `methods`                        | List of UQ method names (e.g., `["mc_dropout_var", "cotuq"]`) |
-| `N`                              | Number of perturbations (SPUQ)                                |
-| `icl_examples`                   | In-context examples for ICL-Sample                            |
-| `num_samples`                    | Ensemble sample count (default=10)                            |
-| `prompt`                         | Text or code input string                                     |
+| Parameter                                         | Description                                                    |
+| :------------------------------------------------ | :------------------------------------------------------------- |
+| `model`                                           | The model instance (CodeBERT, ChatGLM, etc.)                   |
+| `methods`                                         | List of UQ methods, e.g. `["mc_dropout_variance", "deepgini"]` |
+| `input_text`                                      | Text or code input                                             |
+| `prompt`                                          | Optional task instruction (mainly for generative models)       |
+| `model_type`                                      | `"discriminative"` or `"generative"`                           |
+| `label_tokens`                                    | Class tokens for classification-like tasks                     |
+| `num_samples`                                     | Number of stochastic forward passes for ensemble methods       |
+| `num_perturb`                                     | Number of perturbations for SPUQ                               |
+| `num_clarifications`                              | Number of paraphrased prompts for ICL-Sample                   |
+| `depth`, `branching`                              | Parameters for tree-of-thought reasoning                       |
+| `max_new_tokens`, `temperature`, `top_p`, `top_k` | Sampling parameters for generative inference                   |
 
 ---
 
@@ -188,4 +245,3 @@ If you use **UncertaintyZoo** in your research, please cite:
 <p align="center" style="font-size:13px;color:#777;">
   🌟 Designed for research on model reliability, interpretability, and robust reasoning.
 </p>
-```
