@@ -1,7 +1,43 @@
-torch==2.7.1
-transformers==4.32.1
-numpy==2.3.1
-scipy==1.16.0
-scikit-learn==1.7.0
-rouge==1.0.1
-pandas==2.3.1
+# ===== Core dependencies =====
+torch>=2.0.0
+transformers>=4.42.0
+tokenizers>=0.15.0
+tqdm>=4.66.0
+numpy>=1.25.0
+scipy>=1.11.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+
+# ===== Visualization / diagnostics =====
+matplotlib>=3.7.0
+seaborn>=0.12.2
+
+# ===== Sentence / Embedding Models (for ICE, SEC, CosSim, etc.) =====
+sentence-transformers>=2.2.2
+simcse>=1.0.0        # optional; used if you prefer SimCSE embeddings
+
+# ===== Topological / geometric uncertainty (TopologyUQ) =====
+giotto-tda>=0.6.0    # for persistent homology and topological entropy
+networkx>=3.1
+
+# ===== Optional LLM backbones =====
+accelerate>=0.29.0
+bitsandbytes>=0.43.0     # optional for 8-bit/4-bit inference
+peft>=0.11.0              # for LoRA finetuning if used
+datasets>=2.18.0          # for loading evaluation datasets
+
+# ===== Metrics / evaluation =====
+evaluate>=0.4.2
+rouge-score>=0.1.2
+
+# ===== Utility / data management =====
+omegaconf>=2.3.0
+pyyaml>=6.0.1
+regex>=2023.10.3
+
+# ===== Experimental / visualization (optional but useful) =====
+plotly>=5.17.0
+umap-learn>=0.5.5
+
+# ===== OS / environment =====
+psutil>=5.9.8
